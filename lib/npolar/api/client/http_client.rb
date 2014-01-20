@@ -1,58 +1,63 @@
 # encoding: utf-8
-require "uri"
-require "typhoeus"
 
-class ::Typhoeus::Response
+require "yajl/json_gem"
+require "hashie"
+require "typhoeus"
+require "forwardable"
+require "uri"
+
+class Typhoeus::Response
   alias :status :code
   
   def uri
     URI.parse(options[:effective_url])  
   end
   
+  #alias :verb :http_method
 end
 
-class ::Typhoeus::Request
+class Typhoeus::Request
 
   def uri
     URI.parse(url)
   end
   
-  def verb
+  def http_method
     options[:method].to_s.upcase
   end
-  alias :http_method :verb
-  alias :request_method :verb
+  alias :verb :http_method
+  alias :request_method :http_method
   
 end
 
-module Npolar::Api::Client
-
-  # Ruby client for https://api.npolar.no, based on Typhoeus and libcurl
+module Npolar
+module Api
+module Client
+  # Ruby client for https://api.npolar.no, based on Typhoeus:
   # https://github.com/typhoeus/typhoeus
-  class JsonApiClient
+  class HttpClient
     
     VERSION = "0.10.pre"
     
     class << self
       attr_accessor :key
     end
-    attr_accessor :model, :log, :authorization, :concurrency, :slice, :param, :options
-    attr_reader :uri, :responses, :response, :options
+    attr_accessor :model, :log, :authorization, :concurrency, :slice
+    attr_reader :uri, :param, :header, :responses, :response, :options
 
     extend ::Forwardable
     def_delegators :uri, :scheme, :host, :port, :path
 
     BASE = "https://api.npolar.no"
 
-    HEADER = { "User-Agent" => Npolar::Api::Client::USER_AGENT,
+    OPTIONS = { :headers =>
+      { "User-Agent" => "#{self.name}-#{VERSION}/Typhoeus-#{Typhoeus::VERSION}/libcurl-#{`curl --version`.chomp.split(" ")[1]}",
         "Content-Type" => "application/json",
         "Accept" => "application/json",
         "Accept-Charset" => "UTF-8",
         "Accept-Encoding" => "gzip,deflate",
         "Connection" => "keep-alive"
-    }
-    # Typhoeus options => RENAME
-    OPTIONS = { :headers => HEADER,
+      },
       :timeout => nil, # 600 seconds or nil for never
       :forbid_reuse => true
     }
@@ -61,7 +66,7 @@ module Npolar::Api::Client
     # @param [String | URI] base Base URI for all requests
     # @param [Hash] options (for Typhoeus)
     def initialize(base=BASE, options=OPTIONS)
-      # Prepend https://api.npolar.no if base is relative (like /service)    
+      # Prepend https://api.npolar.no if base is relative (like /service) 
       if base =~ /^\//
         path = base
         base = BASE+path
@@ -71,28 +76,23 @@ module Npolar::Api::Client
         @uri = URI.parse(base)
       end
       @options = options
-      init
-    end
-
-    def init
       @model = Hashie::Mash.new
       @log = ENV["NPOLAR_ENV"] == "test" ? ::Logger.new("/dev/null") : ::Logger.new(STDERR)
       @concurrency = 5
       @slice = 1000
-      @param={}
     end
 
     # All documents
     def all
-      mash = get_body("_feed", {:fields=>"*"})
-      unless mash.key? "feed"
-        raise "No feed returned"
+      all = get_body("_all", {:fields=>"*"})
+      if model?
+        all = all.map {|d| model.class.new(d)}
       end
-      mash.feed.entries
+      all
     end
     alias :feed :all
 
-    # Base URI (without trailing slash)
+    # Base URI
     def base
       unless @base.nil?
         @base.gsub(/\/$/, "")
@@ -118,24 +118,14 @@ module Npolar::Api::Client
     def delete_uris(uris)
       @responses=[]
       multi_request("DELETE", uris, nil, param, header).run
-      responses
+      @responses
     end
 
     # Request header Hash
     def header
-      options[:headers] 
+      options[:headers]
     end
     alias :headers :header
-    
-    def header=(header)
-      if header.is_a? Array
-        options[:headers]=header
-      else
-        options[:headers].merge! header
-      end
-      
-    end
-    alias :headers= :header=
 
     def http_method
       @method
@@ -150,21 +140,16 @@ module Npolar::Api::Client
 
     # deprecated
     def get_body(uri, param={})
-      @param = param
-      response = get(uri)
+      
+      response = get(uri, param)
       unless response.success?
         raise "Could not GET #{uri} status: #{response.code}"
       end
       
       begin 
         body = JSON.parse(response.body)
-        if body.is_a? Hash
-          
-          if model? and not body.key? "feed"
-            body = model.class.new(body)
-          else
-            body = Hashie::Mash.new(body)
-          end
+        if body.is_a? Hash and model?
+          body = model.class.new(body)
         end
         
       rescue
@@ -185,21 +170,20 @@ module Npolar::Api::Client
     end
 
     # GET
-    def get(path=nil)
+    def get(path=nil, param={}, header={})
       if param.key? "ids"
         get_ids(uri, param["ids"])
       else
+       
         request = request(path, :get, nil, param, header)
       
         request.on_success do |response|
           if response.headers["Content-Type"] =~ /application\/json/
-            parsed = JSON.parse(response.body)
             if model?
               begin
                 # hmm => will loose model!
                 @modelwas = model
-                @model = model.class.new(parsed)
-                @mash = model
+                @model = model.class.new(JSON.parse(response.body))
               rescue
                 @model = @modelwas
                 # Parsing only for JSON objects
@@ -219,19 +203,18 @@ module Npolar::Api::Client
     def get_uris(uris)
       @responses=[]
       multi_request("GET", uris).run
-      responses
-      ## set on success =>
-      #json = responses.select {|r| r.success? and r.headers["Content-Type"] =~ /application\/(\w+[+])?json/ }
-      #if json.size == responses.size
-      #  responses.map {|r| r.body }
-      #else
-      #  raise "Failed "
-      #end
+      # set on success =>
+      json = responses.select {|r| r.success? and r.headers["Content-Type"] =~ /application\/(\w+[+])?json/ }
+      if json.size == responses.size
+        responses.map {|r| r.body }
+      else
+        raise "Failed "
+      end
     end
     alias :multi_get :get_uris
 
     # HEAD
-    def head(path=nil)
+    def head(path=nil, param={}, header={})
       execute(request(path, :head, nil, param, header))
     end
 
@@ -252,9 +235,9 @@ module Npolar::Api::Client
     
     # POST
     # @param [Array, Hash, String] body
-    def post(body, path=nil)
+    def post(body, path=nil, param={}, header={})        
       if header["Content-Type"] =~ /application\/(\w+[+])?json/
-         chunk_save(path, "POST", body, param, header)
+        chunk_save(path, "POST", body, param, header)
       else
         execute(
           request(path, :post, body, param, header)
@@ -263,7 +246,7 @@ module Npolar::Api::Client
     end
 
     # PUT
-    def put(body, path=nil)
+    def put(body, path=nil, param={}, header={})
       execute(
         request(path, :put, body, param, header)
       )
@@ -410,72 +393,53 @@ module Npolar::Api::Client
     end
 
     def on_complete
-      @on_complete ||= lambda {|response|} #noop
+      @on_complete ||= lambda {|response|}
     end
 
     def on_success
-      @on_success ||= lambda {|response|
+      @on_success||= lambda {|response|
         log.info log_message(response)
       }
     end
 
-    #def on_complete=(on_complete_lambda)
-    #  if @on_complete.nil?
-    #    @on_complete = []
-    #  end
-    #  @on_complete << on_complete_lambda
-    #end
+    def on_complete=(on_complete_lambda)
+      if @on_complete.nil?
+        @on_complete = []
+      end
+      @on_complete << on_complete_lambda
+    end
 
     protected
 
-    # @return [Array] ids
-    def self.fetch_ids(uri)
-      client = self.new(uri)
-      client.model = nil
-     
-      response = client.get
-      #if 200 == response.code
-      #  
-      #end
-
-      idlist = JSON.parse(response.body)
-      
-      if idlist.key? "feed" and idlist["feed"].key? "entries"
-
-        ids = idlist["feed"]["entries"].map {|d|
-          d["id"]
-        }
-        
-      elsif idlist.key? "ids"
-        
-        ids = idlist["ids"]
-
-      else
-        raise "Cannot fetch ids"
-      end
-    end
-
     # @return [Array] URIs      
     def self.uris_from_ids(base, ids)
-
       unless ids.is_a? Array
         if ids =~ /^http(s)?[:]\/\//
-          ids = fetch_ids(ids)
+          client = self.new(ids)
+          client.model = nil
+          
+          response = client.get
+          if 200 == response.code
+            
+          end
+          unless base.is_a? URI
+            base = URI.parse(base)
+          end
+          JSON.parse(response.body)["feed"]["entries"].map {|d|
+            path = base.path+"/"+d["id"]
+           
+            if d.key? "_rev"
+              base.query = "?rev=#{d['_rev']}"
+            end
+            uri = base.dup
+            uri.path = path
+            uri
+          }
+          
         else
           raise "Can only fetch ids via HTTP"
         end
       end
-
-      unless base.is_a? URI
-        base = URI.parse(base)
-      end
-
-      ids.map {|id|
-        path = base.path+"/"+id
-        uri = base.dup
-        uri.path = path
-        uri
-      }
       
     end
     
@@ -501,11 +465,10 @@ module Npolar::Api::Client
       
       # Handle (URI) objects
       paths = paths.map {|p| p.to_s }
-
+      
       log.debug "Queueing multi-#{method} requests, concurrency: #{concurrency}, path(s): #{ paths.size == 1 ? paths[0]: paths.size }"
        
       paths.each do | path |
-        
         multi_request = request(path, method.downcase.to_sym, body, param, header)
         multi_request.on_complete do | response |
           log.debug "Multi-#{method} [#{paths.size}]: "+log_message(response)
@@ -565,11 +528,12 @@ module Npolar::Api::Client
         "#{request.http_method} #{scheme}://#{host}:#{port}#{path} [#{self.class.name}] #{param} #{header}"
       else
         response = r
-
-        "#{response.code} #{response.request.http_method} #{response.request.url} [#{self.class.name}] #{response.total_time} #{response.body.bytesize} #{response.body[0..255]}"
+        "#{response.code} #{response.request.http_method} #{scheme}://#{host}:#{port}#{path} [#{self.class.name}] #{response.total_time} #{response.body.bytesize} #{response.body[0..255]}"
       end
     end
 
   end
   
+end
+end
 end
