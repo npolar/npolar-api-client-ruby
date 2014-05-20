@@ -193,24 +193,24 @@ Options:\n"
 
       case method
         when "DELETE"
-          response = delete(path, parameters, header)
+          response = delete
         when "GET"
-          response = get(path)
+          response = get
         when "HEAD"
-          response = head(path, parameters, header)
+          response = head
         when "PATCH"
-          response = patch(path, parameters, header)
+          response = patch
         when "POST"
           if data.is_a? Dir
             raise "Not implemented"
           else
-            response = post(data, path, parameters, header)
+            response = post(data)
           end
           
           
           
         when "PUT"
-          response = put(data, path, parameters, header)
+          response = put(data)
         else
           raise ArgumentError, "Unsupported HTTP method: #{param[:method]}"
       end
