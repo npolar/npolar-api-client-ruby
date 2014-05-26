@@ -36,8 +36,8 @@ module Npolar::Api::Client
     class << self
       attr_accessor :key
     end
-    attr_accessor :model, :log, :authorization, :concurrency, :slice, :param, :options
-    attr_reader :uri, :responses, :response, :options
+    attr_accessor :uri, :model, :parsed, :log, :authorization, :concurrency, :slice, :param, :options
+    attr_reader :responses, :response, :options
 
     extend ::Forwardable
     def_delegators :uri, :scheme, :host, :port, :path
@@ -83,12 +83,13 @@ module Npolar::Api::Client
     end
 
     # All documents
-    def all
-      mash = get_body("_feed", {:fields=>"*"})
-      unless mash.key? "feed"
-        raise "No feed returned"
+    def all(path="_all")
+      if not param.key "fields"
+        self.param = param||{}.merge ({fields: "*"})
       end
-      mash.feed.entries
+      
+      mash = get_body(path, param)
+      mash
     end
     alias :feed :all
 
@@ -101,7 +102,7 @@ module Npolar::Api::Client
 
     # DELETE
     # 
-    def delete(path=nil, param={}, header={})
+    def delete(path=nil)
       if param.key? "ids"
         delete_ids(uri, param["ids"])
       else
@@ -165,6 +166,8 @@ module Npolar::Api::Client
           else
             body = Hashie::Mash.new(body)
           end
+        elsif body.is_a? Array
+          body.map! {|hash|Hashie::Mash.new(hash)}
         end
         
       rescue
@@ -193,7 +196,9 @@ module Npolar::Api::Client
       
         request.on_success do |response|
           if response.headers["Content-Type"] =~ /application\/json/
-            parsed = JSON.parse(response.body)
+            
+            @parsed = JSON.parse(response.body)
+            
             if model?
               begin
                 # hmm => will loose model!
@@ -444,7 +449,7 @@ module Npolar::Api::Client
 
         ids = idlist["feed"]["entries"].map {|d|
           d["id"]
-        }
+        }.flatten
         
       elsif idlist.key? "ids"
         
@@ -471,7 +476,8 @@ module Npolar::Api::Client
       end
 
       ids.map {|id|
-        path = base.path+"/"+id
+        puts id
+        path = "#{base.path}/#{id}"
         uri = base.dup
         uri.path = path
         uri
@@ -529,13 +535,16 @@ module Npolar::Api::Client
       unless docs.is_a? Array
         docs = JSON.parse(docs)
       end
+      
 
       if docs.is_a? Hash
         docs = [docs]
       end
-      if slice > docs.size
-        log.debug "Slicing #{docs.size} documents into #{(docs.size.to_f/slice.to_f).round} chunks of #{slice} each"
+      
+      if slice < docs.size
+        log.debug "Slicing #{docs.size} documents into #{slice} chunks"
       end
+      
       docs.each_slice(slice) do | chunk |
         queue(method, path, chunk.to_json, param, header)
       end
