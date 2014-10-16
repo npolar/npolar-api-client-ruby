@@ -153,7 +153,7 @@ module Npolar::Api::Client
     def get_body(uri, param={})
       @param = param
       response = get(uri)
-      unless response.success?
+      unless (200.299).include? response.code
         raise "Could not GET #{uri} status: #{response.code}"
       end
       
@@ -575,7 +575,7 @@ module Npolar::Api::Client
       else
         response = r
 
-        "#{response.code} #{response.request.http_method} #{response.request.url} [#{self.class.name}] #{response.total_time} #{response.body.bytesize} #{response.body[0..255]}"
+        "#{response.code} #{response.request.http_method} #{response.request.url} [#{self.class.name}] #{response.total_time} #{response.body.bytesize} #{response.body[0..1024]}"
       end
     end
 
