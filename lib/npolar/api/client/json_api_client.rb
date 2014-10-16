@@ -153,7 +153,7 @@ module Npolar::Api::Client
     def get_body(uri, param={})
       @param = param
       response = get(uri)
-      unless (200.299).include? response.code
+      unless (200..299).include? response.code
         raise "Could not GET #{uri} status: #{response.code}"
       end
       
