@@ -7,7 +7,7 @@ $:.unshift lib unless $:.include?(lib)
   
 Gem::Specification.new do |s|
   s.name        = "npolar-api-client-ruby"
-  s.version     = "0.3.0" # Not DRY, trouble with include Npolar::Api::Client::VERSION
+  s.version     = "0.3.1" # Not DRY, trouble with include Npolar::Api::Client::VERSION
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Conrad Helgeland"]
   s.email       = ["data*npolar.no"]
