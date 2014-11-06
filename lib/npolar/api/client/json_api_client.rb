@@ -558,12 +558,14 @@ module Npolar::Api::Client
           log.info "Saved #{docs.size} document(s) using #{@responses.size} #{method} request(s). Concurrency: #{concurrency}"
         else
           log.info "Saved #{docs.size} documents, sliced into chunks of #{slice} using #{@responses.size} #{method} requests.  Concurrency: #{concurrency}"
-        end
-      else
-        failures = @responses.reject {|r| (200..299).include? r.code }
-        log.debug "#chunk_save error in #{failures.size}/#{responses.size} requests"
+        end      
       end
       
+      failures = @responses.reject {|r| (200..299).include? r.code }
+      if failures.size > 0
+        log.debug "#chunk_save error in #{failures.size}/#{responses.size} requests"
+      end
+
       @responses
     end
 
