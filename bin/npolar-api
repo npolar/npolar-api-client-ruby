@@ -6,8 +6,10 @@
 # For more information: $ ./bin/npolar_api --help
 # or https://github.com/npolar/npolar-api-client/blob/master/README.md
 
-require "bundler/setup"
-require_relative "../lib/npolar/api/client"
-require_relative "../lib/npolar/api/client/npolar_api_command"
+Dir.chdir(__dir__) do
+  require "bundler/setup"
+  require_relative "../lib/npolar/api/client"
+  require_relative "../lib/npolar/api/client/npolar_api_command"
+end
 
 Npolar::Api::Client::NpolarApiCommand.run

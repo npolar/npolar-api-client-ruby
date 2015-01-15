@@ -4,11 +4,11 @@ require "typhoeus"
 
 class ::Typhoeus::Response
   alias :status :code
-  
+
   def uri
-    URI.parse(options[:effective_url])  
+    URI.parse(options[:effective_url])
   end
-  
+
 end
 
 class ::Typhoeus::Request
@@ -16,13 +16,13 @@ class ::Typhoeus::Request
   def uri
     URI.parse(url)
   end
-  
+
   def verb
     options[:method].to_s.upcase
   end
   alias :http_method :verb
   alias :request_method :verb
-  
+
 end
 
 module Npolar::Api::Client
@@ -30,9 +30,9 @@ module Npolar::Api::Client
   # Ruby client for https://api.npolar.no, based on Typhoeus and libcurl
   # https://github.com/typhoeus/typhoeus
   class JsonApiClient
-    
+
     VERSION = "0.10.pre"
-    
+
     class << self
       attr_accessor :key
     end
@@ -56,12 +56,12 @@ module Npolar::Api::Client
       :timeout => nil, # 600 seconds or nil for never
       :forbid_reuse => true
     }
-    
+
     # New client
     # @param [String | URI] base Base URI for all requests
     # @param [Hash] options (for Typhoeus)
     def initialize(base=BASE, options=OPTIONS)
-      # Prepend https://api.npolar.no if base is relative (like /service)    
+      # Prepend https://api.npolar.no if base is relative (like /service)
       if base =~ /^\//
         path = base
         base = BASE+path
@@ -87,7 +87,7 @@ module Npolar::Api::Client
       if not param.key "fields"
         self.param = param||{}.merge ({fields: "*"})
       end
-      
+
       mash = get_body(path, param)
       mash
     end
@@ -101,7 +101,7 @@ module Npolar::Api::Client
     end
 
     # DELETE
-    # 
+    #
     def delete(path=nil)
       if param.key? "ids"
         delete_ids(uri, param["ids"])
@@ -111,11 +111,11 @@ module Npolar::Api::Client
         )
       end
     end
-   
+
     def delete_ids(endpoint, ids)
       delete_uris(self.class.uris_from_ids(endpoint, ids))
     end
-    
+
     def delete_uris(uris)
       @responses=[]
       multi_request("DELETE", uris, nil, param, header).run
@@ -124,17 +124,17 @@ module Npolar::Api::Client
 
     # Request header Hash
     def header
-      options[:headers] 
+      options[:headers]
     end
     alias :headers :header
-    
+
     def header=(header)
       if header.is_a? Array
         options[:headers]=header
       else
         options[:headers].merge! header
       end
-      
+
     end
     alias :headers= :header=
 
@@ -156,11 +156,11 @@ module Npolar::Api::Client
       unless (200..299).include? response.code
         raise "Could not GET #{uri} status: #{response.code}"
       end
-      
-      begin 
+
+      begin
         body = JSON.parse(response.body)
         if body.is_a? Hash
-          
+
           if model? and not body.key? "feed"
             body = model.class.new(body)
           else
@@ -169,13 +169,13 @@ module Npolar::Api::Client
         elsif body.is_a? Array
           body.map! {|hash|Hashie::Mash.new(hash)}
         end
-        
+
       rescue
         body = response.body
       end
-      
+
       body
-      
+
       #if response.headers["Content-Type"] =~ /application\/json/
       #  #if model?
       #  JSON.parse(body)
@@ -184,7 +184,7 @@ module Npolar::Api::Client
       #else
       #  body
       #end
-    
+
     end
 
     # GET
@@ -193,12 +193,12 @@ module Npolar::Api::Client
         get_ids(uri, param["ids"])
       else
         request = request(path, :get, nil, param, header)
-      
+
         request.on_success do |response|
           if response.headers["Content-Type"] =~ /application\/json/
-            
+
             @parsed = JSON.parse(response.body)
-            
+
             if model?
               begin
                 # hmm => will loose model!
@@ -212,15 +212,15 @@ module Npolar::Api::Client
             end
           end
         end
-      
+
       execute(request)
       end
     end
-    
+
     def get_ids(endpoint, ids)
       get_uris(self.class.uris_from_ids(endpoint, ids))
     end
-    
+
     def get_uris(uris)
       @responses=[]
       multi_request("GET", uris).run
@@ -254,7 +254,7 @@ module Npolar::Api::Client
     def model?
       not @model.nil?
     end
-    
+
     # POST
     # @param [Array, Hash, String] body
     def post(body, path=nil)
@@ -289,7 +289,7 @@ module Npolar::Api::Client
 
     # Valid?
     def valid?(document_or_id)
-      # FIXME Hashie::Mash will always respond to #valid? 
+      # FIXME Hashie::Mash will always respond to #valid?
       if not model? or not model.respond_to?(:valid?)
         return true
       end
@@ -297,13 +297,13 @@ module Npolar::Api::Client
       validator = model.class.new(document_or_id)
 
       # Return true if validator is a Hash with errors key !
-      # FIXME Hashie::Mash will always respond to #valid? 
+      # FIXME Hashie::Mash will always respond to #valid?
       if validator.key? :valid? or validator.key? :errors
         return true
       end
-      
+
       valid = validator.valid?
-      
+
       if validator.errors.nil?
         return true
       end
@@ -343,11 +343,11 @@ module Npolar::Api::Client
 
     # @return []
     def request(path=nil, method=:get, body=nil, params={}, headers={})
-      
+
       if path =~ /^http(s)?[:]\/\//
         # Absolute URI
         uri = path
-        
+
       elsif path.nil?
         # Use base URI if path is nil
         uri = base
@@ -355,14 +355,14 @@ module Npolar::Api::Client
       elsif path =~ /^\/\w+/
         # Support /relative URIs by prepending base
         uri = base+path
-        
-      elsif path =~ /^\w+/ and base =~ /^http(s)?[:]\/\//          
+
+      elsif path =~ /^\w+/ and base =~ /^http(s)?[:]\/\//
         uri = base+"/"+path
       else
         # Invalid URI
         raise ArgumentError, "Path is invalid: #{path}"
       end
-    
+
       unless uri.is_a? URI
         uri = URI.parse(uri)
       end
@@ -380,7 +380,7 @@ module Npolar::Api::Client
       if true == authorization or [:delete, :post, :put].include? method
         context[:userpwd] = "#{username}:#{password}"
       end
-      
+
       request = Typhoeus::Request.new(uri.to_s, context)
 
       request.on_complete do |response|
@@ -398,7 +398,7 @@ module Npolar::Api::Client
       @request = request
 
       request
-      
+
     end
 
     def on_failure
@@ -437,22 +437,22 @@ module Npolar::Api::Client
     def self.fetch_ids(uri)
       client = self.new(uri)
       client.model = nil
-     
+
       response = client.get
       #if 200 == response.code
-      #  
+      #
       #end
 
       idlist = JSON.parse(response.body)
-      
+
       if idlist.key? "feed" and idlist["feed"].key? "entries"
 
         ids = idlist["feed"]["entries"].map {|d|
           d["id"]
         }.flatten
-        
+
       elsif idlist.key? "ids"
-        
+
         ids = idlist["ids"]
 
       else
@@ -460,7 +460,7 @@ module Npolar::Api::Client
       end
     end
 
-    # @return [Array] URIs      
+    # @return [Array] URIs
     def self.uris_from_ids(base, ids)
 
       unless ids.is_a? Array
@@ -482,36 +482,36 @@ module Npolar::Api::Client
         uri.path = path
         uri
       }
-      
+
     end
-    
+
     def hydra
       @hydra ||= Typhoeus::Hydra.new(max_concurrency: concurrency)
     end
-    
+
     # Prepare and queue a multi request
-    # 
+    #
     # @return [#run]
     def multi_request(method, paths, body=nil, param=nil, header=nil)
       @multi = true
-      
+
       # Response storage, if not already set
       if @responses.nil?
         @responses = []
       end
-      
+
       # Handle one or many paths
       if paths.is_a? String or paths.is_a? URI
         paths = [paths]
       end
-      
+
       # Handle (URI) objects
       paths = paths.map {|p| p.to_s }
 
       log.debug "Queueing multi-#{method} requests, concurrency: #{concurrency}, path(s): #{ paths.size == 1 ? paths[0]: paths.size }"
-       
+
       paths.each do | path |
-        
+
         multi_request = request(path, method.downcase.to_sym, body, param, header)
         multi_request.on_complete do | response |
           log.debug "Multi-#{method} [#{paths.size}]: "+log_message(response)
@@ -527,29 +527,29 @@ module Npolar::Api::Client
     # @return [Array] responses
     def chunk_save(path=nil, method="POST", docs, param, header)
       @multi = true
-      
+
       if path.nil?
         path = uri
       end
-       
+
       unless docs.is_a? Array
         docs = JSON.parse(docs)
       end
-      
+
 
       if docs.is_a? Hash
         docs = [docs]
       end
-      
+
       if slice < docs.size
         log.debug "Slicing #{docs.size} documents into #{slice} chunks"
       end
-      
+
       docs.each_slice(slice) do | chunk |
         queue(method, path, chunk.to_json, param, header)
       end
       hydra.run
-      
+
       # @todo => on complete
       successes = @responses.select {|r| (200..299).include? r.code }
       if successes.size > 0
@@ -558,9 +558,9 @@ module Npolar::Api::Client
           log.info "Saved #{docs.size} document(s) using #{@responses.size} #{method} request(s). Concurrency: #{concurrency}"
         else
           log.info "Saved #{docs.size} documents, sliced into chunks of #{slice} using #{@responses.size} #{method} requests.  Concurrency: #{concurrency}"
-        end      
+        end
       end
-      
+
       failures = @responses.reject {|r| (200..299).include? r.code }
       if failures.size > 0
         log.debug "#chunk_save error in #{failures.size}/#{responses.size} requests"
@@ -582,5 +582,5 @@ module Npolar::Api::Client
     end
 
   end
-  
+
 end
