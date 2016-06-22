@@ -376,6 +376,7 @@ module Npolar::Api::Client
         body: body,
         params: params,
         headers: headers
+        accept_encoding: "gzip"
       }
       if true == authorization or [:delete, :post, :put].include? method
         context[:userpwd] = "#{username}:#{password}"
