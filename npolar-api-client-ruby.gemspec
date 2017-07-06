@@ -20,10 +20,10 @@ Gem::Specification.new do |s|
   #s.add_development_dependency "rspec", "~> 2.0"
   #s.add_development_dependency "bundler", "~> 2.0"
 
-  s.add_runtime_dependency "hashie"    , "~> 3.4"
-  s.add_runtime_dependency "typhoeus"  , "~> 0.7"
-  s.add_runtime_dependency "yajl-ruby" , "~> 0.0"
-  s.add_runtime_dependency "uuidtools" , "~> 2.1"
+  s.add_runtime_dependency "hashie"    , "~> 3.5.5"
+  s.add_runtime_dependency "typhoeus"  , "~> 1.1.2"
+  s.add_runtime_dependency "yajl-ruby" , "~> 1.2.2"
+  s.add_runtime_dependency "uuidtools" , "~> 2.1.5"
 
   s.files         = Dir.glob("{lib}/**/*") + %w(README.md)
   s.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
