@@ -1,3 +1,6 @@
+require "rubygems"
+require "bundler/setup"
+
 require "yajl/json_gem"
 require "hashie"
 require "typhoeus"
