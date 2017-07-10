@@ -1,9 +1,9 @@
 source "https://rubygems.org"
 
-gem "typhoeus", git: "git://github.com/typhoeus/typhoeus.git"
-gem "yajl-ruby", git: "git://github.com/brianmario/yajl-ruby.git"
+gem "typhoeus", "1.1.2"
+gem "yajl-ruby"
 gem "uuidtools"
-gem "hashie", git:  "git://github.com/intridea/hashie.git"
+gem "hashie", "3.5.5"
 #gem "json-schema", git:  "git://github.com/hoxworth/json-schema.git"
 
 
