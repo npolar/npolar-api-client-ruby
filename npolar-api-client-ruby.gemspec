@@ -9,7 +9,7 @@ require 'npolar/api/client'
 
 Gem::Specification.new do |s|
   s.name        = "npolar-api-client-ruby"
-  s.version     = "0.3.6"
+  s.version     = "0.3.7"
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Conrad Helgeland"]
   s.email       = ["data*npolar.no"]
