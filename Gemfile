@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 
 gem "typhoeus", "1.1.2"
-gem "yajl-ruby"
+gem "yajl-ruby", "1.3.0"
 gem "uuidtools"
 gem "hashie", "3.5.5"
 #gem "json-schema", git:  "git://github.com/hoxworth/json-schema.git"
