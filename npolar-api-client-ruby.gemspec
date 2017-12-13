@@ -29,6 +29,6 @@ Gem::Specification.new do |s|
 
   s.add_runtime_dependency "hashie"    , "3.4.6"
   s.add_runtime_dependency "typhoeus"  , "1.1.2"
-  s.add_runtime_dependency "yajl-ruby" , "1.3.0"
+  s.add_runtime_dependency "yajl-ruby" , "1.3.1"
   s.add_runtime_dependency "uuidtools" , "2.1.5"
 end
