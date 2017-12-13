@@ -7,7 +7,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |s|
   s.name        = "npolar-api-client-ruby"
-  s.version     = "0.3.9"
+  s.version     = "0.3.10"
   s.platform    = Gem::Platform::RUBY
   s.authors     = ["Conrad Helgeland"]
   s.email       = ["data*npolar.no"]
